@@ -109,10 +109,10 @@ public class GrapplingHook : MonoBehaviour
                 isLineMax = false;
                 hook.GetComponent<Hooking>().joint2D.enabled = false;
                 hook.gameObject.SetActive(false);
-                if (gravityCoroutine != null)
-                    StopCoroutine(gravityCoroutine);
+                //if (gravityCoroutine != null)
+                //    StopCoroutine(gravityCoroutine);
 
-                gravityCoroutine = StartCoroutine(TempChangeGravity(0.2f, 0f, 1f));
+                //gravityCoroutine = StartCoroutine(TempChangeGravity(0.2f, 0f, 1f));
 
                 // 슬로우 효과
                 if (slowCoroutine != null)
@@ -132,16 +132,6 @@ public class GrapplingHook : MonoBehaviour
 
                 ThrowEnemy(enemies[0], dir, GameManager.Instance.playerStatsRuntime.hookEnemyThrowForce);
             }
-
-        }
-        if (IsGrounded() && gravityCoroutine != null)
-        {
-            StopCoroutine(gravityCoroutine);
-            gravityCoroutine = null;
-
-            rb.gravityScale = originalGravity;
-            GameManager.Instance.playerStatsRuntime.speed = originalSpeed;
-            sprite.color = Color.white;
         }
     }
 
@@ -212,10 +202,6 @@ public class GrapplingHook : MonoBehaviour
         Collider2D enemyCol = enemy.GetComponent<Collider2D>();
         Collider2D playerCol = GetComponent<Collider2D>();
 
-        // 1초간 충돌 무시
-        if (enemyCol != null && playerCol != null)
-            StartCoroutine(IgnoreCollisionTemporarily(enemyCol, playerCol, 0.3f));
-
         // Rigidbody 처리
         Rigidbody2D rb = enemy.GetComponent<Rigidbody2D>();
         if (rb != null)
@@ -237,37 +223,11 @@ public class GrapplingHook : MonoBehaviour
         hook.gameObject.SetActive(false);
     }
 
-    // 충돌 무시 코루틴
-    IEnumerator IgnoreCollisionTemporarily(Collider2D enemyCol, Collider2D playerCol, float duration)
-    {
-        Physics2D.IgnoreCollision(enemyCol, playerCol, true);
-
-        yield return new WaitForSeconds(duration);
-
-        // 오브젝트가 아직 살아있을 때만 복구
-        if (enemyCol != null && playerCol != null)
-            Physics2D.IgnoreCollision(enemyCol, playerCol, false);
-    }
-    IEnumerator TempChangeGravity(float tempGravity, float tempSpeed, float duration)
-    {
-
-        sprite.color = Color.red;
-        originalSpeed = GameManager.Instance.playerStatsRuntime.speed;
-        originalGravity = rb.gravityScale;
-        rb.gravityScale = tempGravity;
-        GameManager.Instance.playerStatsRuntime.speed = tempSpeed;
-
-        yield return new WaitForSeconds(duration);
-
-        rb.gravityScale = originalGravity;
-        GameManager.Instance.playerStatsRuntime.speed = originalSpeed;
-        gravityCoroutine = null;
-        sprite.color = Color.white;
-    }
     // 슬로우 효과 코루틴
     IEnumerator SlowRoutine()
     {
         // 슬로우 적용
+        sprite.color = Color.red;
         Time.timeScale = slowFactor;
         Time.fixedDeltaTime = 0.02f * Time.timeScale;
 
@@ -283,5 +243,6 @@ public class GrapplingHook : MonoBehaviour
         // 오차 방지를 위해 기본값으로 복구
         Time.timeScale = 1f;
         Time.fixedDeltaTime = 0.02f;
+        sprite.color = Color.white;
     }
 }
