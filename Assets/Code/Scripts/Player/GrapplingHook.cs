@@ -162,7 +162,6 @@ public class GrapplingHook : MonoBehaviour
 
                 slowCoroutine = StartCoroutine(SlowRoutine());
 
-                // 회전 부스트
                 if (swingBoostController != null)
                 {
                     swingBoostController.Boost();
