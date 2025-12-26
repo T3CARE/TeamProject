@@ -1,4 +1,4 @@
-ï»¿using DG.Tweening;
+using DG.Tweening;
 using System.Collections;
 using System.Collections.Generic;
 using Unity.VisualScripting;
@@ -16,16 +16,16 @@ public class GrapplingHook : MonoBehaviour
     public bool isLineMax;
     public bool isAttach;
     public bool isEnemyAttach;
+	public bool isSlowing;		// ½½·Î¿ì¸ğ¼Ç ÁßÀÎÁö ¿©ºÎ
     bool hasShakedOnAttach = false;
     bool hasPlayedAttachSound = false;
     bool isPlayedDraftSound = false;
     bool hasPlayedShootSound = false;
-    bool hasAppliedHookForce = false;
 
-    // ìŠ¬ë¡œìš° íš¨ê³¼ ë³€ìˆ˜
-    public float slowFactor;    // ìŠ¬ë¡œìš° ë¹„ìœ¨
-    public float slowLength;    // ì›ë˜ ì†ë„ë¡œ ë³µê·€í•˜ëŠ” ë° ê±¸ë¦¬ëŠ” ì‹œê°„
-    Coroutine slowCoroutine;    // ìŠ¬ë¡œìš° íš¨ê³¼ ì½”ë£¨í‹´
+    // ½½·Î¿ì È¿°ú º¯¼ö
+    public float slowFactor;    // ½½·Î¿ì ºñÀ²
+    public float slowLength;    // ¿ø·¡ ¼Óµµ·Î º¹±ÍÇÏ´Â µ¥ °É¸®´Â ½Ã°£
+    Coroutine slowCoroutine;    // ½½·Î¿ì È¿°ú ÄÚ·çÆ¾
 
     public Vector3 enemyFollowOffset = Vector3.zero;
     private List<Transform> enemies = new List<Transform>();
@@ -34,7 +34,7 @@ public class GrapplingHook : MonoBehaviour
     DistanceJoint2D hookJoint;
     bool isStopped = false;
 
-	PlayerController player;    // í”Œë ˆì´ì–´
+	PlayerController player;    // ÇÃ·¹ÀÌ¾î
 
 	private void Awake()
 	{
@@ -45,14 +45,15 @@ public class GrapplingHook : MonoBehaviour
 
 	void Start()
     {
-        // ë¼ì¸ì„ ê·¸ë¦¬ëŠ” í¬ì§€ì…˜ì„ ë‘ê°œë¡œ ì„¤ì •í•˜ê³  (PositionCount)
-        // í•œ ì ì€ Playerì˜ í¬ì§€ì…˜, í•œ ì ì€ Hookì˜ í¬ì§€ì…˜ìœ¼ë¡œ ì„¤ì • (SetPosition)
+        // ¶óÀÎÀ» ±×¸®´Â Æ÷Áö¼ÇÀ» µÎ°³·Î ¼³Á¤ÇÏ°í (PositionCount)
+        // ÇÑ Á¡Àº PlayerÀÇ Æ÷Áö¼Ç, ÇÑ Á¡Àº HookÀÇ Æ÷Áö¼ÇÀ¸·Î ¼³Á¤ (SetPosition)
         line.positionCount = 2;
         line.endWidth = line.startWidth = 0.05f;
         line.SetPosition(0, transform.position);
         line.SetPosition(1, hook.position);
         line.useWorldSpace = true;
         isAttach = false;
+		isSlowing = false;
         hook.gameObject.SetActive(false);
 
 		hookJoint = hook.GetComponent<DistanceJoint2D>();
@@ -62,17 +63,17 @@ public class GrapplingHook : MonoBehaviour
         line.SetPosition(0, transform.position);
         line.SetPosition(1, hook.position);
 
-        // ê°ˆê³ ë¦¬ or ì ì— ì²˜ìŒ ë¶™ì—ˆì„ ë•Œ
+        // °¥°í¸® or Àû¿¡ Ã³À½ ºÙ¾úÀ» ¶§
         if ((isAttach || isEnemyAttach) && !hasPlayedAttachSound)
         {
             GameManager.Instance.audioManager.HookAttachSound(1f);
             hasPlayedAttachSound = true;
         }
 
-            if (Mouse.current.leftButton.wasPressedThisFrame && !isHookActive && !isAttach && !isEnemyAttach)
+        if (Mouse.current.leftButton.wasPressedThisFrame && !isHookActive && !isAttach && !isEnemyAttach)
         {
-            GameManager.Instance.cameraShake.ShakeForSeconds(0.1f); // ì¹´ë©”ë¼ í”ë“¤ê¸°
-            GameManager.Instance.audioManager.HookShootSound(0.7f); // ê°ˆê³ ë¦¬ ë°œì‚¬ íš¨ê³¼ìŒ
+            GameManager.Instance.cameraShake.ShakeForSeconds(0.1f); // Ä«¸Ş¶ó Èçµé±â
+            GameManager.Instance.audioManager.HookShootSound(0.7f); // °¥°í¸® ¹ß»ç È¿°úÀ½
             hook.position = transform.position;
             Vector3 mouseWorldPos = Camera.main.ScreenToWorldPoint(Mouse.current.position.ReadValue());
             mouseWorldPos.z = 0f;
@@ -82,34 +83,34 @@ public class GrapplingHook : MonoBehaviour
             hook.gameObject.SetActive(true);
         }
 
-        // í›…ì´ ë°œì‚¬ëœ ìƒíƒœì´ê³ , ì•„ì§ ìµœëŒ€ ì‚¬ê±°ë¦¬ì— ë„ë‹¬í•˜ì§€ ì•Šì•˜ì„ ë•Œ
+        // ÈÅÀÌ ¹ß»çµÈ »óÅÂÀÌ°í, ¾ÆÁ÷ ÃÖ´ë »ç°Å¸®¿¡ µµ´ŞÇÏÁö ¾Ê¾ÒÀ» ¶§
         if (isHookActive && !isLineMax && !isAttach && !isEnemyAttach)
         {
-            // ë§ˆìš°ìŠ¤ ë°©í–¥ìœ¼ë¡œ í›…ì„ ì „ì§„ì‹œí‚´
+            // ¸¶¿ì½º ¹æÇâÀ¸·Î ÈÅÀ» ÀüÁø½ÃÅ´
             hook.Translate(mousedir.normalized * Time.deltaTime * GameManager.Instance.playerStatsRuntime.hookSpeed);
-            // í”Œë ˆì´ì–´ì™€ í›… ì‚¬ì´ì˜ ê±°ë¦¬ê°€ ìµœëŒ€ ì‚¬ê±°ë¦¬ë³´ë‹¤ ì»¤ì§€ë©´
+            // ÇÃ·¹ÀÌ¾î¿Í ÈÅ »çÀÌÀÇ °Å¸®°¡ ÃÖ´ë »ç°Å¸®º¸´Ù Ä¿Áö¸é
             if (Vector2.Distance(transform.position, hook.position) > GameManager.Instance.playerStatsRuntime.hookDistance)
             {
-                // ìµœëŒ€ ì‚¬ê±°ë¦¬ ë„ë‹¬ ìƒíƒœë¡œ ì „í™˜
+                // ÃÖ´ë »ç°Å¸® µµ´Ş »óÅÂ·Î ÀüÈ¯
                 isLineMax = true;
                 hasPlayedShootSound = false;
             }
         }
 
-        // í›…ì´ ìµœëŒ€ ì‚¬ê±°ë¦¬ì— ë„ë‹¬í•œ ì´í›„
+        // ÈÅÀÌ ÃÖ´ë »ç°Å¸®¿¡ µµ´ŞÇÑ ÀÌÈÄ
         else if (isHookActive && isLineMax && !isAttach && !isEnemyAttach)
         {
-            // í›…ì„ í”Œë ˆì´ì–´ ìœ„ì¹˜ë¡œ ë¶€ë“œëŸ½ê²Œ ë˜ëŒë¦¼
+            // ÈÅÀ» ÇÃ·¹ÀÌ¾î À§Ä¡·Î ºÎµå·´°Ô µÇµ¹¸²
             hook.position = Vector2.MoveTowards(hook.position, transform.position, Time.deltaTime * GameManager.Instance.playerStatsRuntime.hookSpeed);
 
-            // í›…ì´ ê±°ì˜ í”Œë ˆì´ì–´ ìœ„ì¹˜ê¹Œì§€ ëŒì•„ì™”ì„ ê²½ìš°
+            // ÈÅÀÌ °ÅÀÇ ÇÃ·¹ÀÌ¾î À§Ä¡±îÁö µ¹¾Æ¿ÔÀ» °æ¿ì
             if (Vector2.Distance(transform.position, hook.position) < 0.1f)
             {
-                // í›… ìƒíƒœ ì´ˆê¸°í™”
+                // ÈÅ »óÅÂ ÃÊ±âÈ­
                 isHookActive = false;
                 isLineMax = false;
                 hasPlayedShootSound = false;
-                // í›… ì˜¤ë¸Œì íŠ¸ ë¹„í™œì„±í™”
+                // ÈÅ ¿ÀºêÁ§Æ® ºñÈ°¼ºÈ­
                 hook.gameObject.SetActive(false);
             }
         }
@@ -122,32 +123,13 @@ public class GrapplingHook : MonoBehaviour
                 hasShakedOnAttach = true;
             }
 
-            //if (!hasAppliedHookForce)
-            //{
-            //    Vector2 dir = hook.position - transform.position;
-            //    float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
-
-            //    if (angle < 90)
-            //    {
-            //        rb.AddForce(Vector2.right * 3f);
-            //    }
-            //    else if (angle > 90)
-            //    {
-            //        rb.AddForce(Vector2.left * 3f);
-            //    }
-
-            //    hasAppliedHookForce = true;
-            //}
-
-            // ë§ˆìš°ìŠ¤ë¥¼ ë—ì„ ë•Œë§Œ í•´ì œ
-            if (Mouse.current.leftButton.wasReleasedThisFrame)
+            if (Mouse.current.leftButton.wasPressedThisFrame)
             {
                 isAttach = false;
                 isHookActive = false;
                 isLineMax = false;
                 hasShakedOnAttach = false;
                 hasPlayedAttachSound = false;
-                hasAppliedHookForce = true;
 
                 hook.GetComponent<Hooking>().joint2D.enabled = false;
                 hook.gameObject.SetActive(false);
@@ -157,13 +139,11 @@ public class GrapplingHook : MonoBehaviour
 
                 slowCoroutine = StartCoroutine(SlowRoutine());
             }
-
-            // ìš°í´ë¦­ ì¤„ ë‹¹ê¸°ê¸°
-            if (Mouse.current.rightButton.isPressed)
+            if (Mouse.current.rightButton.isPressed) // ¿ìÅ¬¸¯ ²Ú ´­·¶À» ¶§
             {
                 if (hookJoint != null && hookJoint.enabled)
                 {
-                    hookJoint.distance = Mathf.Max(0.5f, hookJoint.distance - 0.1f);
+                    hookJoint.distance = Mathf.Max(0.5f, hookJoint.distance - 0.1f); // ¶óÀÎ Á¡Á¡ ÁÙ¾îµé°Ô
 
                     if (!isPlayedDraftSound)
                     {
@@ -172,7 +152,6 @@ public class GrapplingHook : MonoBehaviour
                     }
                 }
             }
-
             if (Mouse.current.rightButton.wasReleasedThisFrame)
             {
                 GameManager.Instance.audioManager.StopSFX();
@@ -180,7 +159,7 @@ public class GrapplingHook : MonoBehaviour
             }
         }
 
-        else if (isEnemyAttach) // ì  ëŒê³ ì˜¤ê¸°
+        else if (isEnemyAttach) // Àû ²ø°í¿À±â
         {
             if (Mouse.current.leftButton.wasPressedThisFrame && enemies.Count > 0)
             {
@@ -205,7 +184,7 @@ public class GrapplingHook : MonoBehaviour
             Vector3 offset = enemyFollowOffset;
             offset.x = playerSprite.flipX ? -Mathf.Abs(enemyFollowOffset.x) : Mathf.Abs(enemyFollowOffset.x);
 
-            enemies[i].localPosition = offset; // ë¶€ëª¨ transform ê¸°ì¤€ localPosition
+            enemies[i].localPosition = offset; // ºÎ¸ğ transform ±âÁØ localPosition
         }
     }
 
@@ -221,24 +200,24 @@ public class GrapplingHook : MonoBehaviour
         if (enemyCol != null && playerCol != null)
             Physics2D.IgnoreCollision(enemyCol, playerCol, true);
 
-        // Rigidbodyê°€ ìˆìœ¼ë©´ Kinematicìœ¼ë¡œ
+        // Rigidbody°¡ ÀÖÀ¸¸é KinematicÀ¸·Î
         Rigidbody2D rb = enemy.GetComponent<Rigidbody2D>();
         if (rb != null)
             rb.bodyType = RigidbodyType2D.Kinematic;
 
-        // í”Œë ˆì´ì–´ ìì‹ìœ¼ë¡œ
+        // ÇÃ·¹ÀÌ¾î ÀÚ½ÄÀ¸·Î
         enemy.SetParent(transform);
 
-        // í”Œë ˆì´ì–´ SpriteRenderer ê°€ì ¸ì˜¤ê¸°
+        // ÇÃ·¹ÀÌ¾î SpriteRenderer °¡Á®¿À±â
         SpriteRenderer playerSprite = GetComponent<SpriteRenderer>();
 
-        // enemyFollowOffset ê¸°ì¤€ìœ¼ë¡œ xë¥¼ ì™¼ìª½/ì˜¤ë¥¸ìª½ ë§ì¶¤
+        // enemyFollowOffset ±âÁØÀ¸·Î x¸¦ ¿ŞÂÊ/¿À¸¥ÂÊ ¸ÂÃã
         Vector3 offset = enemyFollowOffset;
         offset.x = playerSprite.flipX ? -Mathf.Abs(enemyFollowOffset.x) : Mathf.Abs(enemyFollowOffset.x);
 
         enemy.localPosition = offset;
 
-        // í›… & ì¤„ ìˆ¨ê¸°ê¸°
+        // ÈÅ & ÁÙ ¼û±â±â
         hook.gameObject.SetActive(false);
         line.enabled = false;
 
@@ -252,16 +231,16 @@ public class GrapplingHook : MonoBehaviour
     {
         if (!enemies.Contains(enemy)) return;
 
-        GameManager.Instance.audioManager.HookThrowEnemySound(1f); // ì  ë˜ì§€ëŠ” íš¨ê³¼ìŒ
+        GameManager.Instance.audioManager.HookThrowEnemySound(1f); // Àû ´øÁö´Â È¿°úÀ½
         enemies.Remove(enemy);
 
-        // ë¶€ëª¨ í•´ì œ
+        // ºÎ¸ğ ÇØÁ¦
         enemy.SetParent(null);
 
         Collider2D enemyCol = enemy.GetComponent<Collider2D>();
         Collider2D playerCol = GetComponent<Collider2D>();
 
-        // Rigidbody ì²˜ë¦¬
+        // Rigidbody Ã³¸®
         Rigidbody2D rb = enemy.GetComponent<Rigidbody2D>();
         if (rb != null)
         {
@@ -276,21 +255,20 @@ public class GrapplingHook : MonoBehaviour
             hasPlayedAttachSound = false;
         }
 
-
         line.enabled = true;
 
-        // í›… ìƒíƒœ ì´ˆê¸°í™”
+        // ÈÅ »óÅÂ ÃÊ±âÈ­
         isHookActive = false;
         isLineMax = false;
         hook.GetComponent<Hooking>().joint2D.enabled = false;
         hook.gameObject.SetActive(false);
     }
 
-	// ìŠ¬ë¡œìš° íš¨ê³¼ ì½”ë£¨í‹´
+	// ½½·Î¿ì È¿°ú ÄÚ·çÆ¾
 	IEnumerator SlowRoutine()
 	{
-		// ìŠ¬ë¡œìš° ì ìš©
-		sprite.color = Color.red;
+		// ½½·Î¿ì Àû¿ë
+		//sprite.color = Color.red;
 		Time.timeScale = slowFactor;
 		Time.fixedDeltaTime = 0.02f * Time.timeScale;
 
@@ -298,11 +276,15 @@ public class GrapplingHook : MonoBehaviour
 
 		while (elapsed < slowLength)
 		{
-			// í”Œë ˆì´ì–´ê°€ ë•…ì— ë‹¿ê±°ë‚˜ ê·¸ë˜í”Œë§ í›…ì„ ë‹¤ì‹œ ì‚¬ìš©í•˜ê±°ë‚˜ ëª¬ìŠ¤í„°ë¥¼ ì¡ì„ ê²½ìš° ì¦‰ì‹œ ì¢…ë£Œ
+			isSlowing = true;
+			// ÇÃ·¹ÀÌ¾î°¡ ¶¥¿¡ ´ê°Å³ª ±×·¡ÇÃ¸µ ÈÅÀ» ´Ù½Ã »ç¿ëÇÏ°Å³ª ¸ó½ºÅÍ¸¦ ÀâÀ» °æ¿ì Áï½Ã Á¾·á
 			if (player.isGrounded || isAttach || isEnemyAttach)
 			{
-				Debug.Log("ìŠ¬ë¡œìš°ëª¨ì…˜ ì¢…ë£Œ");
-				Debug.Log("isGrounded: " + player.isGrounded + ", isAttach: " + isAttach + ", isEnemyAttach: " + isEnemyAttach);
+				// TODO: Å×½ºÆ®¿ë Ãâ·Â ÄÚµå
+				//Debug.Log("½½·Î¿ì¸ğ¼Ç Á¾·á");
+				//Debug.Log("isGrounded: " + player.isGrounded + ", isAttach: " + isAttach + ", isEnemyAttach: " + isEnemyAttach);
+				Debug.Log("isSlowing: " + isSlowing);
+				isSlowing = false;
 				break;
 			}
 
@@ -310,21 +292,10 @@ public class GrapplingHook : MonoBehaviour
 			yield return null;
 		}
 
-		// ë³µêµ¬
+		// º¹±¸
 		Time.timeScale = 1f;
 		Time.fixedDeltaTime = 0.02f;
 		sprite.color = Color.white;
 	}
-
-    // í˜ ì£¼ê¸°
-    public void ApplyHookImpulse(Vector2 hookPos)
-    {
-        Vector2 dir = (hookPos - (Vector2)transform.position).normalized;
-
-        float horizontal = dir.x > 0 ? 1f : -1f;
-        float power = 3f; // í˜ ì„¸ê¸°
-
-        rb.AddForce(new Vector2(horizontal * power, 1.2f), ForceMode2D.Impulse);
-    }
 
 }
