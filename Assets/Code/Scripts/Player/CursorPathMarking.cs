@@ -42,7 +42,7 @@ public class CursorPathMarking : MonoBehaviour
 		RaycastHit2D hit = Physics2D.Raycast(transform.position, dir, distance, mask);
 
 		// 훅 사용 중이거나 몬스터를 잡고 있을 경우 선 비활성화
-		if(hook.isAttach || hook.isEnemyAttach)
+		if(hook.isAttach)
 		{
 			visualizerLine.Stop();
 			return;
